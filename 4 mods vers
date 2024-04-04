@@ -1,0 +1,298 @@
+#include "FastLED.h"       // подключаем библиотеку работы с ARGB лентой
+#define NUM_LEDS  300      // количество диодов на мачту
+#define LEDPIN_R  3       // пин цифрового ленты R
+#define LEDPIN_L  10       // пин цифрового ленты L
+#define TURNPIN_R 6        // пин слежения за поворотником
+#define TURNPIN_L 11       // пин слежения за поворотником
+#define STOPPIN   5        // пин чтения стопарей
+#define FXPIN     7        // пин спешиал эффекта
+
+//#include "FastLED.h"       // подключаем библиотеку работы с ARGB лентой
+//#define NUM_LEDS  150      // количество диодов на мачту
+//#define LEDPIN_R  10       // пин цифрового ленты R
+//#define LEDPIN_L 11        // пин цифрового ленты L
+//#define TURNPIN_R 2        // пин слежения за поворотником
+//#define TURNPIN_L 3        // пин слежения за поворотником
+//#define STOPPIN   5        // пин чтения стопарей
+
+
+//int TOP_INDEX = int(NUM_LEDS / 2);
+//int thissat = 255;
+//int thishue = 0;
+//int BOTTOM_INDEX = 0;        // светодиод начала отсчёта
+//int EVENODD = NUM_LEDS % 2;
+
+
+int hue;
+int frameR = 0;
+int frameL = 0;
+int frameSos = 0;
+byte mode, marker;
+bool stateR, stateL, stateS, isTurn, stateFX;
+unsigned long Timer1, Timer2, Timer3, Timer4, Timer5;
+
+CRGB leds_r[NUM_LEDS];      // массив состояния диодов R
+CRGB leds_l[NUM_LEDS];      // массив состояния диодов L
+
+void setup(){
+  
+  //Serial.begin(9600);
+
+  pinMode(LEDPIN_R, OUTPUT);
+  pinMode(LEDPIN_L, OUTPUT);
+  pinMode(TURNPIN_R, INPUT);
+  pinMode(TURNPIN_L, INPUT);
+  pinMode(STOPPIN, INPUT);
+  pinMode(FXPIN, INPUT);
+
+  pinMode(TURNPIN_R, INPUT_PULLDOWN);
+  pinMode(TURNPIN_L, INPUT_PULLDOWN);
+  pinMode(STOPPIN, INPUT_PULLDOWN);
+  pinMode(FXPIN, INPUT_PULLDOWN);
+  
+  FastLED.addLeds <WS2812, LEDPIN_R, RGB>(leds_r, NUM_LEDS).setCorrection(TypicalLEDStrip);
+  FastLED.addLeds <WS2812, LEDPIN_L, RGB>(leds_l, NUM_LEDS).setCorrection(TypicalLEDStrip);
+  FastLED.setBrightness(220);
+
+  //fill_rainbow( leds_r, NUM_LEDS, 4, 1);
+ // fill_rainbow( leds_l, NUM_LEDS, 4, 5);
+ // Serial.println("stop");
+
+  Timer1 = millis(); // таймер радуги
+  Timer2 = millis(); // таймер работы тормоза
+  Timer3 = millis(); // таймер количества мерцаний тормоза
+  Timer4 = millis(); // таймер 
+  Timer5 = millis(); // таймер sfx
+}
+
+void loop(){
+ // Serial.println("stop");
+   checkMode();
+if (millis() - Timer4 >= 1 )  {
+    switch(mode){
+
+    case 1:
+      turn(0);
+      break;
+
+    case 2: 
+      turn(1);
+      break;
+
+    case 3:
+    stop();
+
+    // Serial.println("stop");
+      break;
+
+    case 4:
+      sos();
+      break;
+
+    case 5:
+    if (digitalRead(FXPIN)){
+      sfx();
+    }
+    else rainbow();
+    
+      break;
+
+    }
+
+    Timer4 = millis();
+    FastLED.show();
+  }
+ 
+}
+void checkMode(){
+
+  stateR = digitalRead(TURNPIN_R);
+  stateL = digitalRead(TURNPIN_L);
+  stateS = digitalRead(STOPPIN);
+  stateFX = digitalRead(FXPIN);
+
+  if (stateR && !stateL)           {mode = 1; Timer1 = millis(); frameR = 0;             frameSos = 0; Timer2 = millis(); isTurn = 0;}
+  if (stateL && !stateR)           {mode = 2; Timer1 = millis();             frameL = 0; frameSos = 0; Timer2 = millis(); isTurn = 0;}
+  if (stateS && isTurn)            {mode = 3; Timer1 = millis(); frameR = 0; frameL = 0; frameSos = 0;                               }
+  if (stateL && stateR)            {mode = 4; Timer1 = millis(); frameR = 0; frameL = 0;               Timer2 = millis(); isTurn = 0;}
+  if (millis() - Timer1 >= 800)    {mode = 5;                    frameR = 0; frameL = 0; frameSos = 0; Timer2 = millis(); isTurn = 1;}
+  
+}
+
+void turn (bool side){
+  if (side){ //1 Right
+    black(0);
+    if (frameR <= NUM_LEDS/2 - 2){
+      leds_r[frameR] = 0xFF5500;
+      leds_r[frameR+1] = 0xFF5500;
+      leds_r[frameR+2] = 0xFF5500;
+    
+      leds_r[NUM_LEDS-frameR] = 0xFF5500;
+      leds_r[NUM_LEDS-1-frameR] = 0xFF5500;
+      leds_r[NUM_LEDS-2-frameR] = 0xFF5500;
+      frameR+=3;
+    }
+    
+    if (frameR >= NUM_LEDS/2 - 2){
+      leds_r[NUM_LEDS/2-frameR+NUM_LEDS/2] = 0x000000;
+      leds_r[NUM_LEDS/2-1-frameR+NUM_LEDS/2] = 0x000000;
+      leds_r[NUM_LEDS/2-2-frameR+NUM_LEDS/2] = 0x000000;
+
+      leds_r[NUM_LEDS/2+frameR-NUM_LEDS/2] = 0x000000;
+      leds_r[NUM_LEDS/2+1+frameR-NUM_LEDS/2] = 0x000000;
+      leds_r[NUM_LEDS/2+2+frameR-NUM_LEDS/2] = 0x000000;
+      frameR+=3;
+      }
+
+    if (frameR >= NUM_LEDS) frameR = 0;    
+  }
+
+  if (!side){ //0 Right
+    black(1);
+    if (frameL <= NUM_LEDS/2 - 2){
+      leds_l[frameL] = 0xFF5500;
+      leds_l[frameL+1] = 0xFF5500;
+      leds_l[frameL+2] = 0xFF5500;
+      
+      leds_l[NUM_LEDS-frameL] = 0xFF5500;
+      leds_l[NUM_LEDS-1-frameL] = 0xFF5500;
+      leds_l[NUM_LEDS-2-frameL] = 0xFF5500;
+      frameL+=3;
+      }
+    if (frameL >= NUM_LEDS/2 - 2){
+      leds_l[NUM_LEDS/2-frameL+NUM_LEDS/2] = 0x000000;
+      leds_l[NUM_LEDS/2-1-frameL+NUM_LEDS/2] = 0x000000;
+      leds_l[NUM_LEDS/2-2-frameL+NUM_LEDS/2] = 0x000000;
+
+      leds_l[NUM_LEDS/2+frameL-NUM_LEDS/2] = 0x000000;
+      leds_l[NUM_LEDS/2+1+frameL-NUM_LEDS/2] = 0x000000;
+      leds_l[NUM_LEDS/2+2+frameL-NUM_LEDS/2] = 0x000000;
+      frameL+=3;
+      }
+
+    if (frameL >= NUM_LEDS) frameL = 0;
+  
+  }
+}
+
+void stop(){
+
+  if (millis() - Timer2 <= 600){
+    if(millis()-Timer3 <= 150) {black(1);black(0);}
+    else {FastLED.setBrightness(220);red();Timer3 = millis();}
+  }
+  
+  else {FastLED.setBrightness(150);red();}
+}
+
+
+void rainbow(){
+  fill_rainbow( leds_r, NUM_LEDS, hue+=2, 1);
+  fill_rainbow( leds_l, NUM_LEDS, hue+=2, 1);
+}
+
+void red (){
+
+  for( int i = 0; i <= NUM_LEDS;  ++i ){
+    leds_r[i] = 0xFF0000;
+    leds_l[i] = 0xFF0000;
+  }
+}
+
+void black(bool state){
+  if (state){
+    for( int i = 0; i < NUM_LEDS;  ++i ) leds_r[i] = 0;
+  }
+
+  if (!state){
+    for( int i = 0; i < NUM_LEDS;  ++i ) leds_l[i] = 0;
+  }
+}
+
+void sos (){
+
+if (frameSos <= NUM_LEDS/2 - 2){
+      leds_r[frameSos] = 0xFF5500;
+      leds_l[frameSos] = 0xFF5500;
+      leds_r[frameSos+1] = 0xFF5500;
+      leds_l[frameSos+1] = 0xFF5500;
+      leds_r[frameSos+2] = 0xFF5500;
+      leds_l[frameSos+2] = 0xFF5500;
+    
+      leds_r[NUM_LEDS-frameSos] = 0xFF5500;
+      leds_l[NUM_LEDS-frameSos] = 0xFF5500;
+      leds_r[NUM_LEDS-1-frameSos] = 0xFF5500;
+      leds_l[NUM_LEDS-1-frameSos] = 0xFF5500;
+      leds_r[NUM_LEDS-2-frameSos] = 0xFF5500;
+      leds_l[NUM_LEDS-2-frameSos] = 0xFF5500;
+      frameSos+=3;
+    }
+    
+    if (frameSos >= NUM_LEDS/2 - 2){
+      leds_r[NUM_LEDS/2-frameSos+NUM_LEDS/2] = 0x000000;
+      leds_l[NUM_LEDS/2-frameSos+NUM_LEDS/2] = 0x000000;
+      leds_r[NUM_LEDS/2-1-frameSos+NUM_LEDS/2] = 0x000000;
+      leds_l[NUM_LEDS/2-1-frameSos+NUM_LEDS/2] = 0x000000;
+      leds_r[NUM_LEDS/2-2-frameSos+NUM_LEDS/2] = 0x000000;
+      leds_l[NUM_LEDS/2-2-frameSos+NUM_LEDS/2] = 0x000000;
+
+      leds_r[NUM_LEDS/2+frameSos-NUM_LEDS/2] = 0x000000;
+      leds_l[NUM_LEDS/2+frameSos-NUM_LEDS/2] = 0x000000;
+      leds_r[NUM_LEDS/2+1+frameSos-NUM_LEDS/2] = 0x000000;
+      leds_l[NUM_LEDS/2+1+frameSos-NUM_LEDS/2] = 0x000000;
+      leds_r[NUM_LEDS/2+2+frameSos-NUM_LEDS/2] = 0x000000;
+      leds_l[NUM_LEDS/2+2+frameSos-NUM_LEDS/2] = 0x000000;
+      frameSos+=3;
+      }
+
+    if (frameSos >= NUM_LEDS) frameSos = 0;    
+}
+
+void sfx(){
+
+ if (millis()-Timer5 >= 30) {
+
+   if (marker % 2 == 0) {black(1);black(0);}
+   else {
+     if (marker <= 10){musor(1);}
+     else {musor(0);}
+   }
+   marker++;
+   Timer5 = millis();
+   if (marker >= 20) {marker = 0;}
+ }
+
+}
+
+void musor (bool type1){
+
+  if (type1) {
+        //Serial.println("сработал синий");
+    for( int i = 0; i <= NUM_LEDS/2;  ++i ){
+      leds_r[i] = 0x0000FF; //синий
+      leds_l[i] = 0       ; //черный
+    }
+
+    for( int i = NUM_LEDS/2; i <= NUM_LEDS;  ++i ){
+      leds_r[i] = 0       ; //черный
+      leds_l[i] = 0x0000FF; //синий
+    }  
+
+  }
+  
+  if (!type1) {
+  //      Serial.println("сработал красный");
+    for( int i = 0; i <= NUM_LEDS/2;  ++i ){
+      leds_r[i] = 0        ; //черный
+      leds_l[i] = 0xFF0000 ; //красный
+    }
+
+    for( int i = NUM_LEDS/2; i <= NUM_LEDS;  ++i ){
+      leds_r[i] = 0xFF0000 ; //красный
+      leds_l[i] = 0        ; //черный
+    }
+
+  }
+
+}
+
